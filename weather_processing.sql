@@ -134,3 +134,6 @@ SELECT  substring(station FROM 1 FOR 11),
         substring(station FROM 39 FOR 2),
         substring(station FROM 42)
 FROM  stage_stations;
+
+GRANT ALL ON TABLE stations TO sb;
+GRANT ALL PRIVILEGES ON world_stations TO sb;
