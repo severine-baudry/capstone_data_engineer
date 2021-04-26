@@ -5,6 +5,7 @@ from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOpe
 from airflow.utils.dates import days_ago
 from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
+from airflow.macros import ds_add
 
 import os
 import urllib
@@ -21,6 +22,7 @@ import datetime
 
 args = {
     'owner': 'Airflow',
+    'schedule_interval' : '@daily',
 
 }
 
@@ -37,7 +39,6 @@ class download_fromweb(BaseOperator):
 
         super(download_fromweb, self).__init__(*args, **kwargs)
         # Map params here
-        # Example:
         self.url_dir = url_dir
         self.url_file = url_file
         self.out_dir = out_dir
@@ -48,15 +49,52 @@ class download_fromweb(BaseOperator):
         self.log.info(f'DOWNLOAD FROM {url}')
         out = os.path.join(self.out_dir, self.url_file) 
         urllib.request.urlretrieve(url, out)
+        #ti.xcom_push(key='weather_url', value=url)
+        #return url
+    
+
+class download_diff_weather(BaseOperator):
+    #template_fields = ["url_prefix"]
+    @apply_defaults
+    def __init__(self,
+                 # Define your operators params (with defaults) here
+                 # Example:
+                 url_dir = "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/superghcnd/",
+                 url_prefix ="superghcnd_diff_",
+                 out_dir="/tmp/",
+                 *args, **kwargs):
+
+        super(download_diff_weather, self).__init__(*args, **kwargs)
+        # Map params here
+        self.url_dir = url_dir
+        self.url_prefix = url_prefix
+        self.out_dir = out_dir
+        
+    def execute(self, context):
+        today = datetime.datetime.strptime(context["ds_nodash"], "%Y%m%d")
+        yesterday = datetime.datetime.strptime(context["yesterday_ds_nodash"], "%Y%m%d") 
+        self.log.info( f"TODAY {today}" )
+        self.log.info( f"YESTERDAY {yesterday}" )
+        for i in range(1,5):
+            delta = datetime.timedelta(days = -i)
+            begin = yesterday + delta
+            self.log.info(f"{i} DAYS AGO : {begin}")
+        day_1 = ds_add(context["yesterday_ds"], -1)
+        self.log.info( f"AVANT HIER {day_1}" )
+        context["task_instance"].xcom_push(key = "avant_hier", value = day_1)
+        
+      
     
       
 with DAG(
     dag_id='covid_dag_pouet',
     default_args=args,
     #schedule_interval=None,
-    start_date= datetime.datetime.now(), #days_ago(2),
+    start_date= days_ago(2), #datetime.datetime.now(), #days_ago(2),
     tags=['covid'],
 ) as dag:
+        download_diff_weather_task = download_diff_weather(task_id = "download_diff_weather")
+                                                       
         if 0:
             download_nyt_task = download_fromweb(task_id = "download_nyt")
         download_weather_task = download_fromweb(task_id = "download_weather",
