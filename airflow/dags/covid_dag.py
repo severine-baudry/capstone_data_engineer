@@ -76,7 +76,7 @@ class download_diff_weather(BaseOperator):
         yesterday = context["yesterday_ds"]
         day_1 = ds_add(yesterday, -1)
         self.log.info( f"AVANT HIER {day_1}" )
-        for i in range(1,max_days_depth):
+        for i in range(1, self.max_days_depth):
             begin = ds_add(yesterday, -i)
             url_file = self.url_prefix +f"{ ds_format(begin, '%Y-%m-%d', '%Y%m%d')}_to_{ ds_format(yesterday, '%Y-%m-%d', '%Y%m%d')}.tar.gz"
             self.log.info( f"URL : {url_file}")
@@ -90,15 +90,49 @@ class download_diff_weather(BaseOperator):
                 self.log.info(f"Download {url_file} :  success !!")
                 context["task_instance"].xcom_push(key = "first_date", value = begin)
                 context["task_instance"].xcom_push(key = "last_date", value = yesterday)
-                context["task_instance"].xcom_push(key = "weather_diff_file", value = url_file)
+                context["task_instance"].xcom_push(key = "weather_diff_file", value = out)
                 break
         else :
             self.log.error(f"downloading diff weather files failed : try to increase {self.max_days_depth}")
             raise(Exception( "downloading diff weather files failed") )
             
     
-    
-      
+class dummy_download( BaseOperator):   
+    @apply_defaults
+    def __init__(self,
+                 # Define your operators params (with defaults) here
+                 # Example:
+                 url_dir = "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/superghcnd/",
+                 url_prefix ="superghcnd_diff_",
+                 out_dir="/tmp/",
+                 max_days_depth = 5,
+                 *args, **kwargs):
+
+        super(dummy_download, self).__init__(*args, **kwargs)
+        # Map params here
+        self.url_dir = url_dir
+        self.url_prefix = url_prefix
+        self.out_dir = out_dir
+        self.max_days_depth = max_days_depth
+        
+    def execute(self, context):
+        yesterday = context["yesterday_ds"]
+        day_1 = ds_add(yesterday, -1)
+        self.log.info( f"AVANT HIER {day_1}" )
+        for i in range(1, self.max_days_depth):
+            begin = ds_add(yesterday, -i)
+            url_file = self.url_prefix +f"{ ds_format(begin, '%Y-%m-%d', '%Y%m%d')}_to_{ ds_format(yesterday, '%Y-%m-%d', '%Y%m%d')}.tar.gz"
+            out = os.path.join(self.out_dir, url_file)
+            if    os.path.isfile(out) :
+                self.log.info(f"{out} has been donwloaded !!")
+                context["task_instance"].xcom_push(key = "first_date", value = begin)
+                context["task_instance"].xcom_push(key = "last_date", value = yesterday)
+                context["task_instance"].xcom_push(key = "weather_diff_file", value = out)
+                break
+        else :
+            self.log.error(f"downloading diff weather files failed : try to increase {self.max_days_depth}")
+            raise(Exception( "downloading diff weather files failed") )
+     
 with DAG(
     dag_id='covid_dag_pouet',
     default_args=args,
@@ -106,11 +140,13 @@ with DAG(
     start_date= days_ago(2), #datetime.datetime.now(), #days_ago(2),
     tags=['covid'],
 ) as dag:
-        download_diff_weather_task = download_diff_weather(task_id = "download_diff_weather")
+    
+ #       download_diff_weather_task = download_diff_weather(task_id = "download_diff_weather")
+        download_diff_weather_task = dummy_download(task_id = "download_diff_weather")
                                                        
         if 0:
             download_nyt_task = download_fromweb(task_id = "download_nyt")
-        download_weather_task = download_fromweb(task_id = "download_weather",
+            download_weather_task = download_fromweb(task_id = "download_weather",
                                     url_dir = "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/superghcnd/",
                                     url_file = "superghcnd_diff_{{ yesterday_ds_nodash }}_to_{{ ds_nodash }}.tar.gz")
 #                                   url_file = "superghcnd_diff_20210420_to_20210421.tar.gz")
@@ -119,7 +155,7 @@ with DAG(
             application="/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/airflow/python/transform_weather.py", 
             task_id="process_weather",
             conn_id = "spark_default",
-            application_args = ["/tmp/superghcnd_diff_{{ yesterday_ds_nodash }}_to_{{ ds_nodash }}.tar.gz", 
+            application_args = [ "{{ ti.xcom_pull( task_ids = 'download_diff_weather', key = 'weather_diff_file') }}", 
                                 "/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/OUT_DATA/map_locations_stations",
                                 "/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/OUT_DATA/weather_data"]
     
@@ -138,4 +174,4 @@ with DAG(
         #conn_id = "spark_default"
     #)
 
-download_weather_task >> process_weather
+download_diff_weather_task >> process_weather
