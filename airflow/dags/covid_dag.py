@@ -8,6 +8,9 @@ from airflow.utils.decorators import apply_defaults
 from airflow.macros import ds_add, ds_format
 
 import os
+import datetime
+import tarfile
+
 import urllib
 import requests
 from urllib.error import *
@@ -18,7 +21,6 @@ from pyspark import SparkConf
 from pyspark.sql import SparkSession
 import logging
 
-import datetime
 
 args = {
     'owner': 'Airflow',
@@ -123,11 +125,18 @@ class dummy_download( BaseOperator):
             begin = ds_add(yesterday, -i)
             url_file = self.url_prefix +f"{ ds_format(begin, '%Y-%m-%d', '%Y%m%d')}_to_{ ds_format(yesterday, '%Y-%m-%d', '%Y%m%d')}.tar.gz"
             out = os.path.join(self.out_dir, url_file)
-            if    os.path.isfile(out) :
+            if os.path.isfile(out) :
                 self.log.info(f"{out} has been donwloaded !!")
                 context["task_instance"].xcom_push(key = "first_date", value = begin)
                 context["task_instance"].xcom_push(key = "last_date", value = yesterday)
-                context["task_instance"].xcom_push(key = "weather_diff_file", value = out)
+                tar = tarfile.open(out, "r:*")
+                tar_root = os.path.commonprefix(tar.getnames())
+                untar_dir = os.path.join("/tmp/", tar_root)
+                self.log.info( f"TAR DIR : {untar_dir}" )
+                tar.extractall( "/tmp/")
+                tar.close()
+                
+                context["task_instance"].xcom_push(key = "weather_diff_dir", value = untar_dir)
                 break
         else :
             self.log.error(f"downloading diff weather files failed : try to increase {self.max_days_depth}")
@@ -155,7 +164,7 @@ with DAG(
             application="/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/airflow/python/transform_weather.py", 
             task_id="process_weather",
             conn_id = "spark_default",
-            application_args = [ "{{ ti.xcom_pull( task_ids = 'download_diff_weather', key = 'weather_diff_file') }}", 
+            application_args = [ "{{ ti.xcom_pull( task_ids = 'download_diff_weather', key = 'weather_diff_dir') }}", 
                                 "/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/OUT_DATA/map_locations_stations",
                                 "/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/OUT_DATA/weather_data"]
     
