@@ -5,7 +5,7 @@ from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOpe
 from airflow.utils.dates import days_ago
 from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
-from airflow.macros import ds_add
+from airflow.macros import ds_add, ds_format
 
 import os
 import urllib
@@ -62,6 +62,7 @@ class download_diff_weather(BaseOperator):
                  url_dir = "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/superghcnd/",
                  url_prefix ="superghcnd_diff_",
                  out_dir="/tmp/",
+                 max_days_depth = 5,
                  *args, **kwargs):
 
         super(download_diff_weather, self).__init__(*args, **kwargs)
@@ -69,21 +70,33 @@ class download_diff_weather(BaseOperator):
         self.url_dir = url_dir
         self.url_prefix = url_prefix
         self.out_dir = out_dir
+        self.max_days_depth = max_days_depth
         
     def execute(self, context):
-        today = datetime.datetime.strptime(context["ds_nodash"], "%Y%m%d")
-        yesterday = datetime.datetime.strptime(context["yesterday_ds_nodash"], "%Y%m%d") 
-        self.log.info( f"TODAY {today}" )
-        self.log.info( f"YESTERDAY {yesterday}" )
-        for i in range(1,5):
-            delta = datetime.timedelta(days = -i)
-            begin = yesterday + delta
-            self.log.info(f"{i} DAYS AGO : {begin}")
-        day_1 = ds_add(context["yesterday_ds"], -1)
+        yesterday = context["yesterday_ds"]
+        day_1 = ds_add(yesterday, -1)
         self.log.info( f"AVANT HIER {day_1}" )
-        context["task_instance"].xcom_push(key = "avant_hier", value = day_1)
-        
-      
+        for i in range(1,max_days_depth):
+            begin = ds_add(yesterday, -i)
+            url_file = self.url_prefix +f"{ ds_format(begin, '%Y-%m-%d', '%Y%m%d')}_to_{ ds_format(yesterday, '%Y-%m-%d', '%Y%m%d')}.tar.gz"
+            self.log.info( f"URL : {url_file}")
+            url = urljoin(self.url_dir, url_file)
+            out = os.path.join(self.out_dir, url_file)
+            try :
+                urllib.request.urlretrieve(url, out)
+            except Exception as e :
+                self.log.info(f"cannot download {url_file} : {e}")
+            else :
+                self.log.info(f"Download {url_file} :  success !!")
+                context["task_instance"].xcom_push(key = "first_date", value = begin)
+                context["task_instance"].xcom_push(key = "last_date", value = yesterday)
+                context["task_instance"].xcom_push(key = "weather_diff_file", value = url_file)
+                break
+        else :
+            self.log.error(f"downloading diff weather files failed : try to increase {self.max_days_depth}")
+            raise(Exception( "downloading diff weather files failed") )
+            
+    
     
       
 with DAG(
