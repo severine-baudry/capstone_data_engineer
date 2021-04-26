@@ -17,6 +17,8 @@ from pyspark import SparkConf
 from pyspark.sql import SparkSession
 import logging
 
+import datetime
+
 args = {
     'owner': 'Airflow',
 
@@ -52,7 +54,7 @@ with DAG(
     dag_id='covid_dag_pouet',
     default_args=args,
     #schedule_interval=None,
-    start_date=days_ago(2),
+    start_date= datetime.datetime.now(), #days_ago(2),
     tags=['covid'],
 ) as dag:
         if 0:
@@ -63,7 +65,7 @@ with DAG(
 #                                   url_file = "superghcnd_diff_20210420_to_20210421.tar.gz")
         
         process_weather = SparkSubmitOperator(
-            application="/home/user/airflow/python/transform_weather.py", 
+            application="/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/airflow/python/transform_weather.py", 
             task_id="process_weather",
             conn_id = "spark_default",
             application_args = ["/tmp/superghcnd_diff_{{ yesterday_ds_nodash }}_to_{{ ds_nodash }}.tar.gz", 
