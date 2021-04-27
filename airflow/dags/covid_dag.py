@@ -8,7 +8,7 @@ from airflow.utils.decorators import apply_defaults
 from airflow.macros import ds_add, ds_format
 
 import os
-import datetime
+from datetime import datetime, timedelta
 import tarfile
 
 import urllib
@@ -75,9 +75,11 @@ class download_diff_weather(BaseOperator):
         self.max_days_depth = max_days_depth
         
     def execute(self, context):
+        self.log.info( f"I AM {self.__class__.__name__}" )
         yesterday = context["yesterday_ds"]
         day_1 = ds_add(yesterday, -1)
         self.log.info( f"AVANT HIER {day_1}" )
+        self.log.info( f"MAX DAYS DEPTH {self.max_days_depth}" )
         for i in range(1, self.max_days_depth):
             begin = ds_add(yesterday, -i)
             url_file = self.url_prefix +f"{ ds_format(begin, '%Y-%m-%d', '%Y%m%d')}_to_{ ds_format(yesterday, '%Y-%m-%d', '%Y%m%d')}.tar.gz"
@@ -92,7 +94,15 @@ class download_diff_weather(BaseOperator):
                 self.log.info(f"Download {url_file} :  success !!")
                 context["task_instance"].xcom_push(key = "first_date", value = begin)
                 context["task_instance"].xcom_push(key = "last_date", value = yesterday)
-                context["task_instance"].xcom_push(key = "weather_diff_file", value = out)
+                
+                tar = tarfile.open(out, "r:*")
+                tar_root = os.path.commonprefix(tar.getnames())
+                untar_dir = os.path.join("/tmp/", tar_root)
+                self.log.info( f"TAR DIR : {untar_dir}" )
+                tar.extractall( "/tmp/")
+                tar.close()
+                
+                context["task_instance"].xcom_push(key = "weather_diff_dir", value = untar_dir)
                 break
         else :
             self.log.error(f"downloading diff weather files failed : try to increase {self.max_days_depth}")
@@ -118,6 +128,7 @@ class dummy_download( BaseOperator):
         self.max_days_depth = max_days_depth
         
     def execute(self, context):
+        self.log.info( f"I AM {self.__class_.__name__}" )
         yesterday = context["yesterday_ds"]
         day_1 = ds_add(yesterday, -1)
         self.log.info( f"AVANT HIER {day_1}" )
@@ -145,13 +156,13 @@ class dummy_download( BaseOperator):
 with DAG(
     dag_id='covid_dag_pouet',
     default_args=args,
-    #schedule_interval=None,
-    start_date= days_ago(2), #datetime.datetime.now(), #days_ago(2),
+    schedule_interval='@daily',
+    start_date= datetime(2021,4,26), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
     tags=['covid'],
 ) as dag:
     
- #       download_diff_weather_task = download_diff_weather(task_id = "download_diff_weather")
-        download_diff_weather_task = dummy_download(task_id = "download_diff_weather")
+        download_diff_weather_task = download_diff_weather(task_id = "download_diff_weather")
+ #       download_diff_weather_task = dummy_download(task_id = "download_diff_weather")
                                                        
         if 0:
             download_nyt_task = download_fromweb(task_id = "download_nyt")
