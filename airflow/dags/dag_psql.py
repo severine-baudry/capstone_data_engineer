@@ -103,27 +103,47 @@ with DAG(
             )
              
             
-    #filter_date = PostgresOperator(
-        #task_id = "filter_date",
-        #postgres_conn_id = "postgres_default",
-        #sql = """
-            #DELETE FROM recent_per_county WHERE date > ( DATE '2021-04-10') ;
-        #"""
-        #)
-    
-    #filter_locations = PostgresOperator(
-        #task_id = "filter_location",
-        #postgres_conn_id = "postgres_default",
-        #sql = """
-             #CREATE TABLE recent_per_county_2 AS
-            #(   SELECT date, location_id, deaths, cases
-                #FROM recent_per_county AS n JOIN nyt_locations_geography as l
-                #ON  (l.county = n.county) AND (l.state = n.state) AND ( (l.fips = n.fips) OR ( l.fips Is NULL AND n.fips IS NULL) )
+    filter_date = PostgresOperator(
+        task_id = "filter_date",
+        postgres_conn_id = "postgres_default",
+        sql = """
+            ALTER TABLE recent_per_county 
+            ADD COLUMN last date;
+            UPDATE recent_per_county 
+            SET last = last_data.date
+            FROM last_data 
+            WHERE last_data.location_id = recent_per_county.location_id;
+            DELETE FROM recent_per_county
+            WHERE date <= last;
+            ALTER TABLE recent_per_county
+            DROP COLUMN last;
             
-            #);
-
-        #"""
-        #)
+        """
+        )
+    update_last_date = PostgresOperator(
+        task_id = "update_last_date",
+        postgres_conn_id = "postgres_default",
+        sql = """
+            DROP TABLE IF EXISTS last_data;
+            
+            CREATE TABLE last_data AS
+                (SELECT date, county, state, fips, cases, deaths , rank() over (PARTITION BY location_id ORDER BY date DESC)
+                FROM recent_per_county
+                );
+            DELETE FROM last_data
+            WHERE rank > 1;
+            ALTER TABLE last_data DROP COLUMN rank;            
+        """
+        )
+    append_full_per_county = PostgresOperator(
+        task_id = "append_full_per_county",
+        postgres_conn_id = "postgres_default",
+        sql = """
+        INSERT INTO covid_per_county(date, location_id, daily_cases, daily_deaths)
+        SELECT date, location_id, daily_cases, daily_deaths
+        FROM recent_per_county;
+        """
+        )
     
     drop_recent_per_county_table = PostgresOperator(
         task_id = "drop_recent_per_county_table",
@@ -132,14 +152,7 @@ with DAG(
         DROP TABLE IF EXISTS recent_per_county;
         """
         )
-    drop_recent_per_county_2_table = PostgresOperator(
-        task_id = "drop_temp_county_2_table",
-        postgres_conn_id = "postgres_default",
-        sql = """
-        DROP TABLE IF EXISTS recent_per_county_2;
-        """
-        )
+
     
     
-[ drop_recent_per_county_table, drop_recent_per_county_2_table] >> create_recent_per_county_table >> load_recent_per_county_table >> add_location_id >> retrieve_past_data >> compute_daily_stats
-#filter_date >> filter_locations 
+drop_recent_per_county_table >> create_recent_per_county_table >> load_recent_per_county_table >> add_location_id >> retrieve_past_data >> compute_daily_stats >> filter_date >> append_full_per_county >> update_last_date
