@@ -72,10 +72,10 @@ with DAG(
                 SELECT * FROM t0  WHERE rank = 1
             )
             INSERT INTO recent_per_county(location_id, state, county, fips, date, cases, deaths)
-            SELECT  last_data.location_id, last_data.state, last_data.county, last_data.fips, last_data.date, last_data.cases, last_data.deaths 
-            FROM last_data JOIN min_recent 
-            ON last_data.location_id = min_recent.location_id
-            WHERE last_data.date < min_recent.date;        
+            SELECT  most_recent_per_location.location_id, most_recent_per_location.state, most_recent_per_location.county, most_recent_per_location.fips, most_recent_per_location.date, most_recent_per_location.cases, most_recent_per_location.deaths 
+            FROM most_recent_per_location JOIN min_recent 
+            ON most_recent_per_location.location_id = min_recent.location_id
+            WHERE most_recent_per_location.date < min_recent.date;        
         """
         )   
     
@@ -110,9 +110,9 @@ with DAG(
             ALTER TABLE recent_per_county 
             ADD COLUMN last date;
             UPDATE recent_per_county 
-            SET last = last_data.date
-            FROM last_data 
-            WHERE last_data.location_id = recent_per_county.location_id;
+            SET last = most_recent_per_location.date
+            FROM most_recent_per_location 
+            WHERE most_recent_per_location.location_id = recent_per_county.location_id;
             DELETE FROM recent_per_county
             WHERE date <= last;
             ALTER TABLE recent_per_county
@@ -124,15 +124,24 @@ with DAG(
         task_id = "update_last_date",
         postgres_conn_id = "postgres_default",
         sql = """
-            DROP TABLE IF EXISTS last_data;
+            CREATE TABLE new_recent AS
+
+            WITH tmp0 AS
+            (
+            SELECT * FROM most_recent_per_location UNION SELECT date, location_id, fips, county, state, deaths, cases FROM recent_per_county
+            ),
+            tmp1 AS            
+            (
+                SELECT *, rank() OVER (PARTITION BY location_id ORDER BY date DESC)
+                FROM tmp0
+            )
+            SELECT date, location_id, fips, county, state, deaths, cases
+            FROM tmp1
+            WHERE rank =1;
             
-            CREATE TABLE last_data AS
-                (SELECT date, county, state, fips, cases, deaths , rank() over (PARTITION BY location_id ORDER BY date DESC)
-                FROM recent_per_county
-                );
-            DELETE FROM last_data
-            WHERE rank > 1;
-            ALTER TABLE last_data DROP COLUMN rank;            
+            DROP TABLE most_recent_per_location;
+            ALTER TABLE new_recent RENAME TO most_recent_per_location;
+          
         """
         )
     append_full_per_county = PostgresOperator(
@@ -153,6 +162,5 @@ with DAG(
         """
         )
 
-    
-    
-drop_recent_per_county_table >> create_recent_per_county_table >> load_recent_per_county_table >> add_location_id >> retrieve_past_data >> compute_daily_stats >> filter_date >> append_full_per_county >> update_last_date
+drop_recent_per_county_table >> create_recent_per_county_table >> load_recent_per_county_table  >> add_location_id >> retrieve_past_data >> compute_daily_stats >> filter_date >> append_full_per_county >> update_last_date
+
