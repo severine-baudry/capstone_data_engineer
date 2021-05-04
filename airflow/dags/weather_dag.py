@@ -182,7 +182,16 @@ with DAG(
             postgres_conn_id = "postgres_default",
             sql="""
             DROP TABLE IF EXISTS recent_insert;
-            CREATE TABLE IF NOT EXISTS recent_insert (LIKE weather);
+            CREATE TABLE IF NOT EXISTS recent_insert(
+                station_id varchar(12),
+                date varchar(8),
+                measured varchar(4),
+                value int, 
+                measurement_flag varchar(1), 
+                quality_flag varchar(1), 
+                source_flag varchar(1), 
+                hour varchar(6)
+            );
             
             COPY recent_insert FROM '"""  +
             "{{ti.xcom_pull(key='weather_diff_dir')}}"  + 
@@ -194,7 +203,16 @@ with DAG(
             postgres_conn_id = "postgres_default",
             sql="""
             DROP TABLE IF EXISTS recent_delete;
-            CREATE TABLE IF NOT EXISTS recent_delete (LIKE weather);
+            CREATE TABLE IF NOT EXISTS recent_delete(
+                station_id varchar(12),
+                date varchar(8),
+                measured varchar(4),
+                value int, 
+                measurement_flag varchar(1), 
+                quality_flag varchar(1), 
+                source_flag varchar(1), 
+                hour varchar(6)
+            );
             COPY recent_delete FROM '"""  +
             "{{ti.xcom_pull(key='weather_diff_dir')}}"  + 
             """/delete.csv' WITH CSV HEADER;            
@@ -204,7 +222,16 @@ with DAG(
             task_id = "stage_recent_update",
             postgres_conn_id = "postgres_default",
             sql="""
-            DROP TABLE IF EXISTS recent_update;
+            CREATE TABLE IF NOT EXISTS recent_update(
+                station_id varchar(12),
+                date varchar(8),
+                measured varchar(4),
+                value int, 
+                measurement_flag varchar(1), 
+                quality_flag varchar(1), 
+                source_flag varchar(1), 
+                hour varchar(6)
+            );
             CREATE TABLE IF NOT EXISTS recent_update (LIKE weather);
             COPY recent_update FROM '"""  +
             "{{ti.xcom_pull(key='weather_diff_dir')}}"  + 
@@ -218,12 +245,40 @@ with DAG(
             sql = sql_filter,
             params= {"full_table" : "recent_insert", 
                      "filtered_table" : "recent_insert_filtered",
-                     "selected_stations" : "map_locations_stations"}
+                     "selected_stations" : "weatherelem_station"}
             )
- #           parameters = {'filtered_table' : "recent_insert_filtered",
- #                         'stage_table' : "recent_insert"}
         
-        #filter_quality_check = PostgresOperator(
+        filter_delete = PostgresOperator(
+            task_id = "filter_delete",
+            postgres_conn_id = "postgres_default",
+            sql = sql_filter,
+            params= {"full_table" : "recent_delete", 
+                     "filtered_table" : "recent_delete_filtered",
+                     "selected_stations" : "weatherelem_station"}
+            )
+        filter_update = PostgresOperator(
+            task_id = "filter_update",
+            postgres_conn_id = "postgres_default",
+            sql = sql_filter,
+            params= {"full_table" : "recent_update", 
+                     "filtered_table" : "recent_update_filtered",
+                     "selected_stations" : "weatherelem_station"}
+            )
+        
+        process_delete = PostgresOperator(
+            task_id = "process_delete",
+            postgres_conn_id = "postgres_default",
+            sql = """
+                DELETE FROM weather_data
+                USING recent_delete_filtered AS r
+                WHERE (weather_data.measured IS NOT DISTINCT FROM r.measured) AND
+                    (weather_data.station_id IS NOT DISTINCT FROM r.station_id) AND
+                    (weather_data.date IS NOT DISTINCT FROM r.date) AND
+                    (weather_data.value IS NOT DISTINCT FROM r.value) 
+                """
+                )
+        
+                #filter_quality_check = PostgresOperator(
             #task_id = "filter_quality_check",
             #postgres_conn_id = "postgres_default",
             #sql = """
@@ -233,3 +288,5 @@ with DAG(
     
 download_diff_weather_task >> [stage_recent_insert, stage_recent_update, stage_recent_delete]
 stage_recent_insert >> filter_insert
+stage_recent_delete >> filter_delete >> process_delete
+stage_recent_update >> filter_update
