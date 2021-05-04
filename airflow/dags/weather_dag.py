@@ -232,7 +232,6 @@ with DAG(
                 source_flag varchar(1), 
                 hour varchar(6)
             );
-            CREATE TABLE IF NOT EXISTS recent_update (LIKE weather);
             COPY recent_update FROM '"""  +
             "{{ti.xcom_pull(key='weather_diff_dir')}}"  + 
             """/update.csv' WITH CSV HEADER;            
