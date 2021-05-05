@@ -148,22 +148,26 @@ sql_filter = """
             ON sel.station_id = temp.station_id AND sel.measured = temp.measured
 
             """
+
+sql_create_stage_table = """
+            DROP TABLE IF EXISTS {{params.stage_table}};
+            CREATE TABLE IF NOT EXISTS {{params.stage_table}}(
+                station_id varchar(12),
+                date varchar(8),
+                measured varchar(4),
+                value int, 
+                measurement_flag varchar(1), 
+                quality_flag varchar(1), 
+                source_flag varchar(1), 
+                hour varchar(6)
+            );
             
-sql_filter_v1 = """
-            DROP TABLE IF EXISTS {{params.filtered_table}};
-            CREATE TABLE {{params.filtered_table}} AS
-            WITH temp AS (
-                SELECT * FROM {{params.full_table}}
-                WHERE quality_flag IS NULL
-                )
-            SELECT * 
-            FROM temp JOIN {{params.selected_stations}}  AS sel
-            ON sel.location_id = temp.location_id AND sel.date = temp.date
-            
-            """
-sql_filter_v0 = """
-            SELECT * FROM {{params.table}}
-            """
+            COPY {{params.stage_table}} 
+            FROM \'{{ti.xcom_pull(key='weather_diff_dir')}}/{{params.stage_file}}\' 
+            WITH CSV HEADER
+            """  
+
+
 with DAG(
     dag_id='daily_weather_2',
     default_args=args,
@@ -180,63 +184,26 @@ with DAG(
         stage_recent_insert = PostgresOperator(
             task_id = "stage_recent_insert",
             postgres_conn_id = "postgres_default",
-            sql="""
-            DROP TABLE IF EXISTS recent_insert;
-            CREATE TABLE IF NOT EXISTS recent_insert(
-                station_id varchar(12),
-                date varchar(8),
-                measured varchar(4),
-                value int, 
-                measurement_flag varchar(1), 
-                quality_flag varchar(1), 
-                source_flag varchar(1), 
-                hour varchar(6)
-            );
-            
-            COPY recent_insert FROM '"""  +
-            "{{ti.xcom_pull(key='weather_diff_dir')}}"  + 
-            """/insert.csv' WITH CSV HEADER; 
-            """            
+            sql= sql_create_stage_table,
+            params = { "stage_table" : "recent_insert",
+                      "stage_file" : "insert.csv"
+                    }
             )
         stage_recent_delete = PostgresOperator(
             task_id = "stage_recent_delete",
             postgres_conn_id = "postgres_default",
-            sql="""
-            DROP TABLE IF EXISTS recent_delete;
-            CREATE TABLE IF NOT EXISTS recent_delete(
-                station_id varchar(12),
-                date varchar(8),
-                measured varchar(4),
-                value int, 
-                measurement_flag varchar(1), 
-                quality_flag varchar(1), 
-                source_flag varchar(1), 
-                hour varchar(6)
-            );
-            COPY recent_delete FROM '"""  +
-            "{{ti.xcom_pull(key='weather_diff_dir')}}"  + 
-            """/delete.csv' WITH CSV HEADER;            
-            """            
+            sql=sql_create_stage_table,
+            params = { "stage_table" : "recent_delete",
+                      "stage_file" : "delete.csv"
+                    }
             )
         stage_recent_update = PostgresOperator(
             task_id = "stage_recent_update",
             postgres_conn_id = "postgres_default",
-            sql="""
-            DROP TABLE IF EXISTS recent_update;
-            CREATE TABLE IF NOT EXISTS recent_update(
-                station_id varchar(12),
-                date varchar(8),
-                measured varchar(4),
-                value int, 
-                measurement_flag varchar(1), 
-                quality_flag varchar(1), 
-                source_flag varchar(1), 
-                hour varchar(6)
-            );
-            COPY recent_update FROM '"""  +
-            "{{ti.xcom_pull(key='weather_diff_dir')}}"  + 
-            """/update.csv' WITH CSV HEADER;            
-            """            
+            sql=sql_create_stage_table,
+            params = { "stage_table" : "recent_update",
+                      "stage_file" : "update.csv"
+                    }          
             )
         
         filter_insert = PostgresOperator(
