@@ -222,6 +222,7 @@ with DAG(
             task_id = "stage_recent_update",
             postgres_conn_id = "postgres_default",
             sql="""
+            DROP TABLE IF EXISTS recent_update;
             CREATE TABLE IF NOT EXISTS recent_update(
                 station_id varchar(12),
                 date varchar(8),
@@ -277,6 +278,27 @@ with DAG(
                 """
                 )
         
+        process_insert = PostgresOperator(
+            task_id = "process_insert",
+            postgres_conn_id = "postgres_default",
+            sql = """       
+                INSERT INTO weather_data AS w
+                SELECT * FROM recent_insert_filtered 
+                ON CONFLICT( measured, station_id, date) DO 
+                UPDATE SET value = EXCLUDED.value
+                """
+                )
+        process_update = PostgresOperator(
+            task_id = "process_update",
+            postgres_conn_id = "postgres_default",
+            sql = """       
+                INSERT INTO weather_data AS w
+                SELECT * FROM recent_update_filtered 
+                ON CONFLICT( measured, station_id, date) DO 
+                UPDATE SET value = EXCLUDED.value
+                """
+                )
+        
                 #filter_quality_check = PostgresOperator(
             #task_id = "filter_quality_check",
             #postgres_conn_id = "postgres_default",
@@ -288,4 +310,8 @@ with DAG(
 download_diff_weather_task >> [stage_recent_insert, stage_recent_update, stage_recent_delete]
 stage_recent_insert >> filter_insert
 stage_recent_delete >> filter_delete >> process_delete
-stage_recent_update >> filter_update
+stage_recent_update >> filter_update >> process_update
+stage_recent_insert >> filter_insert >> process_insert
+process_delete >> process_update >> process_insert
+
+
