@@ -4,7 +4,7 @@ from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 import pyspark.sql.types as T
 from pyspark.sql.functions import udf, col, lit
-from pyspark.sql.types import MapType, StringType
+from pyspark.sql.types import MapType, StringType, DateType
 from operator import add
 
 import sys
@@ -20,6 +20,9 @@ log_marker= "BLABLABLA-- "
 def my_log(logger, msg):
     logger.warning( log_marker + msg)
 
+@udf(StringType())
+def parse_race_ethnicity(line):
+    return line.split(",")[0]
 
 if __name__ == "__main__":
     #log = logging.getLogger("py4j")  
@@ -64,7 +67,9 @@ if __name__ == "__main__":
     # transform to data frame
     df_cases = spark.read.json(spark.sparkContext.parallelize(cases_per_date))
     my_log(log, f"nb rows in dataframe : {df_cases.count()}")
-    # write to postgres
+    df_cases = df_cases.withColumn("race_ethnicity_combined", parse_race_ethnicity("race_ethnicity_combined"))
+    df_cases = df_cases.withColumn("cdc_case_earliest_dt", col("cdc_case_earliest_dt").cast(DateType()))
+   # write to postgres
     
     df_cases.write\
             .format("jdbc")\

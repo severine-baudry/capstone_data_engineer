@@ -71,7 +71,19 @@ with DAG(
             application_args = ["--apptoken", "SocrataAppToken", 
                                 "--last_date", "{{ti.xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_cdc_date')}}",
                                 ]
-            
+            )
+        insert_covid_pergroup_task = PostgresOperator(
+            task_id = "insert_covid_pergroup_task",
+            postgres_conn_id = "postgres_default",
+            sql = """
+                INSERT INTO covid_per_popgroup(cdc_case_earliest_dt, sex_id, age_group_id, race_ethnicity_id, count)
+                SELECT cdc_case_earliest_dt, sex_id, age_group_id, race_ethnicity_id, count
+                FROM recent_cdc AS n
+                JOIN  dim_age_group AS a ON a.age_group = n.age_group
+                JOIN dim_sex AS s ON s.sex = n.sex
+                JOIN dim_race_ethnicity AS e ON e.race = n.race_ethnicity_combined
+                ;
+            """
             )
     #xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_date') 
-last_date_popgroup_task >>  download_recent_cdc_task   
+last_date_popgroup_task >>  download_recent_cdc_task >> insert_covid_pergroup_task
