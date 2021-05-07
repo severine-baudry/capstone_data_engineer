@@ -8,7 +8,7 @@ from airflow.utils.dates import days_ago
 from airflow.models import BaseOperator, Variable
 from airflow.utils.decorators import apply_defaults
 from airflow.macros import ds_add, ds_format
-
+from airflow.operators.python import get_current_context
 import os
 from datetime import datetime, timedelta
 import tarfile
@@ -30,37 +30,6 @@ args = {
     'owner': 'Airflow',
 }
 
-class download_cdc(BaseOperator):
-    @apply_defaults
-    def __init__(self,
-                 url = "data.cdc.gov",
-                 dataset_identifier = "vbim-akqf",
-                 socrata_apptoken_var = "socrata_apptoken",
-                 timeout = 100,
-                 *args, **kwargs):
-        super(download_cdc, self).__init__(*args, **kwargs)
-        self.url = url
-        self.dataset_identifier = dataset_identifier
-        self.socrata_apptoken_var = socrata_apptoken_var
-        self.timeout = timeout
-        
-    def execute(self, context):
-        self.log.info( f"I AM {self.__class__.__name__}" )
-        apptoken = Variable.get(self.socrata_apptoken_var)
-        client = Socrata(self.url,
-                 apptoken,
-                 timeout = self.timeout)
-        self.log.info(f"socrata app token = {apptoken}")
-        #str_min_date = datetime(2021, 4,1).isoformat() + ".000"
-        str_min_date = context["task_instance"].xcom_pull(key='last_date')
-        self.log.info(f"min date : {str_min_date}")
-        cases_per_date = client.get(self.dataset_identifier,
-                           group = "cdc_case_earliest_dt, sex, age_group, race_ethnicity_combined",
-                           select = "cdc_case_earliest_dt, sex, age_group, race_ethnicity_combined, count(*)"
-                           ,where = f"cdc_case_earliest_dt > '{str_min_date}'",
-                           limit = 200000
-                           )
-        self.log.info(f"nb records : {len(cases_per_date)}")
 
 class get_last_date_popgroup(BaseOperator):
     @apply_defaults
@@ -79,7 +48,8 @@ class get_last_date_popgroup(BaseOperator):
         #str_date = results[0][0].isoformat()
         str_date = last_date.isoformat()+".000"
         self.log.info(f"str_date : {str_date}, {type(str_date)}")
-        context["task_instance"].xcom_push(key = "last_date", value = str_date)
+        context["task_instance"].xcom_push(key = "last_cdc_date", value = str_date)
+
 
 with DAG(
     dag_id='covid_per_popgroup',
@@ -94,7 +64,14 @@ with DAG(
         last_date_popgroup_task = get_last_date_popgroup(
             task_id = "last_date_popgroup_task"
             )
-        download_cdc_task = download_cdc(
-                task_id = "download_cdc_task")
-    
-last_date_popgroup_task >>  download_cdc_task   
+        download_recent_cdc_task = SparkSubmitOperator(
+            task_id = "download_recent_cdc_task",
+            conn_id = "spark_default",
+            application = "/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/airflow/python/stage_recent_cdc.py",
+            application_args = ["--apptoken", "SocrataAppToken", 
+                                "--last_date", "{{ti.xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_cdc_date')}}",
+                                ]
+            
+            )
+    #xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_date') 
+last_date_popgroup_task >>  download_recent_cdc_task   
