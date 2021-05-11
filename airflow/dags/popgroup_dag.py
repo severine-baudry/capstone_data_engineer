@@ -2,6 +2,8 @@ from airflow.models import DAG
 from airflow.providers.apache.spark.operators.spark_jdbc import SparkJDBCOperator
 from airflow.providers.apache.spark.operators.spark_sql import SparkSqlOperator
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
+from airflow.providers.apache.spark.hooks.spark_submit import SparkSubmitHook
+
 from airflow.providers.postgres.operators.postgres import PostgresOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.utils.dates import days_ago
@@ -9,6 +11,7 @@ from airflow.models import BaseOperator, Variable
 from airflow.utils.decorators import apply_defaults
 from airflow.macros import ds_add, ds_format
 from airflow.operators.python import get_current_context
+
 import os
 from datetime import datetime, timedelta
 import tarfile
@@ -49,8 +52,8 @@ class get_last_date_popgroup(BaseOperator):
         str_date = last_date.isoformat()+".000"
         self.log.info(f"str_date : {str_date}, {type(str_date)}")
         context["task_instance"].xcom_push(key = "last_cdc_date", value = str_date)
-
-
+                        
+    
 with DAG(
     dag_id='covid_per_popgroup',
     default_args=args,
@@ -64,14 +67,18 @@ with DAG(
         last_date_popgroup_task = get_last_date_popgroup(
             task_id = "last_date_popgroup_task"
             )
+        
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.dirname(current_dir)
         download_recent_cdc_task = SparkSubmitOperator(
             task_id = "download_recent_cdc_task",
             conn_id = "spark_default",
-            application = "/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/airflow/python/stage_recent_cdc.py",
+            application = os.path.join(root_dir, "python", "stage_recent_cdc.py"),
             application_args = ["--apptoken", Variable.get("socrata_apptoken"), 
                                 "--last_date", "{{ti.xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_cdc_date')}}",
-                                ]
+                                ],
             )
+            
         insert_covid_pergroup_task = PostgresOperator(
             task_id = "insert_covid_pergroup_task",
             postgres_conn_id = "postgres_default",
