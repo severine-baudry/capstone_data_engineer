@@ -25,7 +25,8 @@ import logging
 
 args = {
     'owner': 'Airflow',
-    'schedule_interval' : '@daily',
+    'schedule_interval' : '@once',
+    'start_date' : datetime(2021,5,2),
 
 }
 
@@ -60,8 +61,8 @@ class download_fromweb(BaseOperator):
 with DAG(
     dag_id='covid_dag_pouet',
     default_args=args,
-    schedule_interval='@daily',
     start_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
+    schedule_interval = '@once',
     tags=['covid'],
 ) as dag:
                                                            
