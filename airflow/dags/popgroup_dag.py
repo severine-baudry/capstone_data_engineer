@@ -68,7 +68,7 @@ with DAG(
             task_id = "download_recent_cdc_task",
             conn_id = "spark_default",
             application = "/home/user/CODE/BIG_DATA/CAPSTONE_PROJECT/covid-analysis/airflow/python/stage_recent_cdc.py",
-            application_args = ["--apptoken", "SocrataAppToken", 
+            application_args = ["--apptoken", Variable.get("socrata_apptoken"), 
                                 "--last_date", "{{ti.xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_cdc_date')}}",
                                 ]
             )
