@@ -53,44 +53,44 @@ class get_last_date_popgroup(BaseOperator):
         self.log.info(f"str_date : {str_date}, {type(str_date)}")
         context["task_instance"].xcom_push(key = "last_cdc_date", value = str_date)
                         
+
+def covid_per_popgroup_subdag(parent_dag_id, child_dag_id, args):      
+        with DAG(
+            dag_id=f'{parent_dag_id}.{child_dag_id}',
+            default_args=args,
+            #start_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
+            #schedule_interval = '@once',
+            #tags=['covid'],
+        ) as dag:
     
-with DAG(
-    dag_id='covid_per_popgroup',
-    default_args=args,
-    schedule_interval= '@once', #'@monthly', # for testing #  @daily',
-    start_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
-#    end_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
-    max_active_runs = 1,
-    tags=['covid'],
-    ) as dag:
         
-        last_date_popgroup_task = get_last_date_popgroup(
-            task_id = "last_date_popgroup_task"
-            )
-        
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        root_dir = os.path.dirname(current_dir)
-        download_recent_cdc_task = SparkSubmitOperator(
-            task_id = "download_recent_cdc_task",
-            conn_id = "spark_default",
-            application = os.path.join(root_dir, "python", "stage_recent_cdc.py"),
-            application_args = ["--apptoken", Variable.get("socrata_apptoken"), 
-                                "--last_date", "{{ti.xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_cdc_date')}}",
-                                ],
-            )
+            last_date_popgroup_task = get_last_date_popgroup(
+                task_id = "last_date_popgroup_task"
+                )
             
-        insert_covid_pergroup_task = PostgresOperator(
-            task_id = "insert_covid_pergroup_task",
-            postgres_conn_id = "postgres_default",
-            sql = """
-                INSERT INTO covid_per_popgroup(cdc_case_earliest_dt, sex_id, age_group_id, race_ethnicity_id, count)
-                SELECT cdc_case_earliest_dt, sex_id, age_group_id, race_ethnicity_id, count
-                FROM recent_cdc AS n
-                JOIN  dim_age_group AS a ON a.age_group = n.age_group
-                JOIN dim_sex AS s ON s.sex = n.sex
-                JOIN dim_race_ethnicity AS e ON e.race = n.race_ethnicity_combined
-                ;
-            """
-            )
-    #xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_date') 
-last_date_popgroup_task >>  download_recent_cdc_task >> insert_covid_pergroup_task
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            root_dir = os.path.dirname(current_dir)
+            download_recent_cdc_task = SparkSubmitOperator(
+                task_id = "download_recent_cdc_task",
+                conn_id = "spark_default",
+                application = os.path.join(root_dir, "python", "stage_recent_cdc.py"),
+                application_args = ["--apptoken", Variable.get("socrata_apptoken"), 
+                                    "--last_date", "{{ti.xcom_pull( task_ids = 'last_date_popgroup_task', key = 'last_cdc_date')}}",
+                                    ],
+                )
+                
+            insert_covid_pergroup_task = PostgresOperator(
+                task_id = "insert_covid_pergroup_task",
+                postgres_conn_id = "postgres_default",
+                sql = """
+                    INSERT INTO covid_per_popgroup(cdc_case_earliest_dt, sex_id, age_group_id, race_ethnicity_id, count)
+                    SELECT cdc_case_earliest_dt, sex_id, age_group_id, race_ethnicity_id, count
+                    FROM recent_cdc AS n
+                    JOIN  dim_age_group AS a ON a.age_group = n.age_group
+                    JOIN dim_sex AS s ON s.sex = n.sex
+                    JOIN dim_race_ethnicity AS e ON e.race = n.race_ethnicity_combined
+                    ;
+                """
+                )
+            last_date_popgroup_task >>  download_recent_cdc_task >> insert_covid_pergroup_task
+            return dag

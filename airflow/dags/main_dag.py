@@ -4,6 +4,7 @@ from airflow.operators.subdag import SubDagOperator
 from datetime import datetime
 
 from covid_dag import covid_subdag
+from popgroup_dag import covid_per_popgroup_subdag
 
 args = {
     'owner': 'Airflow',
@@ -15,6 +16,7 @@ args = {
 
 PARENT_DAG_NAME = "main_dag"
 SUBDAG_COUNTY_NAME = "covid_county_subdag"
+SUBDAG_POPGROUP_NAME = "covid_popgroup_subdag"
 
 with DAG(
     dag_id = PARENT_DAG_NAME,
@@ -27,6 +29,10 @@ with DAG(
     sub_dag_covid_county = SubDagOperator(
         subdag=covid_subdag(PARENT_DAG_NAME,SUBDAG_COUNTY_NAME, args),
         task_id=SUBDAG_COUNTY_NAME
+        )
+    sub_dag_covid_popgroup = SubDagOperator(
+        subdag=covid_per_popgroup_subdag(PARENT_DAG_NAME,SUBDAG_POPGROUP_NAME, args),
+        task_id=SUBDAG_POPGROUP_NAME
         )
     
 
