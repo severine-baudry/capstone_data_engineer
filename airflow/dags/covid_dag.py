@@ -7,6 +7,7 @@ from airflow.utils.dates import days_ago
 from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
 from airflow.macros import ds_add, ds_format
+from operators.data_download import download_fromweb
 
 import os
 from datetime import datetime, timedelta
@@ -24,33 +25,6 @@ import logging
 
 
 import sql_covid_counties
-
-
-class download_fromweb(BaseOperator):
-    template_fields = ["url_file"]
-    @apply_defaults
-    def __init__(self,
-                 # Define your operators params (with defaults) here
-                 # Example:
-                 url_dir = "https://github.com/nytimes/covid-19-data/raw/master/",
-                 url_file ="us-counties-recent.csv",
-                 out_dir="/tmp/",
-                 *args, **kwargs):
-
-        super(download_fromweb, self).__init__(*args, **kwargs)
-        # Map params here
-        self.url_dir = url_dir
-        self.url_file = url_file
-        self.out_dir = out_dir
-        
-    def execute(self, context):
-        url = urljoin(self.url_dir, self.url_file)
-
-        self.log.info(f'DOWNLOAD FROM {url}')
-        out = os.path.join(self.out_dir, self.url_file) 
-        urllib.request.urlretrieve(url, out)
-        #ti.xcom_push(key='weather_url', value=url)
-        #return url
     
 
 def covid_subdag(parent_dag_id, child_dag_id, args):      

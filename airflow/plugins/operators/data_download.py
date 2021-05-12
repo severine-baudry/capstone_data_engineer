@@ -11,6 +11,32 @@ import requests
 from urllib.error import *
 from urllib.parse import urljoin
 
+class download_fromweb(BaseOperator):
+    template_fields = ["url_file"]
+    @apply_defaults
+    def __init__(self,
+                 # Define your operators params (with defaults) here
+                 # Example:
+                 url_dir = "https://github.com/nytimes/covid-19-data/raw/master/",
+                 url_file ="us-counties-recent.csv",
+                 out_dir="/tmp/",
+                 *args, **kwargs):
+
+        super(download_fromweb, self).__init__(*args, **kwargs)
+        # Map params here
+        self.url_dir = url_dir
+        self.url_file = url_file
+        self.out_dir = out_dir
+        
+    def execute(self, context):
+        url = urljoin(self.url_dir, self.url_file)
+
+        self.log.info(f'DOWNLOAD FROM {url}')
+        out = os.path.join(self.out_dir, self.url_file) 
+        urllib.request.urlretrieve(url, out)
+        #ti.xcom_push(key='weather_url', value=url)
+        #return url
+
 class download_diff_weather(BaseOperator):
     @apply_defaults
     def __init__(self,
