@@ -54,15 +54,16 @@ class get_last_date_popgroup(BaseOperator):
         context["task_instance"].xcom_push(key = "last_cdc_date", value = str_date)
                         
 
-def covid_per_popgroup_subdag(parent_dag_id, child_dag_id, args):      
-        with DAG(
-            dag_id=f'{parent_dag_id}.{child_dag_id}',
-            default_args=args,
-            #start_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
-            #schedule_interval = '@once',
-            #tags=['covid'],
-        ) as dag:
-    
+with DAG(
+    dag_id='covid_per_popgroup',
+    default_args=args,
+    schedule_interval= '@once', #'@monthly', # for testing #  @daily',
+    start_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
+#    end_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
+    max_active_runs = 1,
+    tags=['covid'],
+    ) as dag:
+   
         
             last_date_popgroup_task = get_last_date_popgroup(
                 task_id = "last_date_popgroup_task"
@@ -93,4 +94,3 @@ def covid_per_popgroup_subdag(parent_dag_id, child_dag_id, args):
                 """
                 )
             last_date_popgroup_task >>  download_recent_cdc_task >> insert_covid_pergroup_task
-            return dag
