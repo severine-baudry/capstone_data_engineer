@@ -4,8 +4,8 @@ from airflow.operators.subdag import SubDagOperator
 from datetime import datetime
 
 from covid_dag import covid_subdag
-from popgroup_dag import covid_per_popgroup_subdag
 from weather_dag import daily_weather_subdag
+
 args = {
     'owner': 'Airflow',
     'schedule_interval' : '@once',
