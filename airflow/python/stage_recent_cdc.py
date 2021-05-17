@@ -52,8 +52,6 @@ if __name__ == "__main__":
                 l_args.apptoken,
                 timeout = l_args.timeout)
     
-    my_log(log, f"socrata app token = {l_args.apptoken}")
-    #str_min_date = datetime(2021, 4,1).isoformat() + ".000"
     my_log(log, f"min date : {l_args.last_date}")
     # retrieve new covid cases per population group
     cases_per_date = client.get(l_args.dataset_identifier,
@@ -63,12 +61,14 @@ if __name__ == "__main__":
                         limit = 200000,
                         content_type = "json"
                         )
-    my_log(log, f"nb new records : {len(cases_per_date)}")
+    if len(cases_per_date) == 0:
+        raise Exception( f"No new data from CDC available since {l_args.last_date}" )
     # transform to data frame
     df_cases = spark.read.json(spark.sparkContext.parallelize(cases_per_date))
     my_log(log, f"nb rows in dataframe : {df_cases.count()}")
     df_cases = df_cases.withColumn("race_ethnicity_combined", parse_race_ethnicity("race_ethnicity_combined"))
     df_cases = df_cases.withColumn("cdc_case_earliest_dt", col("cdc_case_earliest_dt").cast(DateType()))
+
    # write to postgres
     
     df_cases.write\

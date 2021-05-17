@@ -18,6 +18,8 @@ from datetime import datetime, timedelta
 
 args = {
     'owner': 'Airflow',
+    'wait_for_downstream' : True,
+    'sla' : timedelta(hours = 1),
 }
 
 

@@ -31,6 +31,8 @@ from sodapy import Socrata
 
 args = {
     'owner': 'Airflow',
+    'wait_for_downstream' : True,
+    'sla' : timedelta(hours = 1)
 }
 
 
@@ -57,7 +59,7 @@ class get_last_date_popgroup(BaseOperator):
 with DAG(
     dag_id='covid_per_popgroup',
     default_args=args,
-    schedule_interval= '@once', #'@monthly', # for testing #  @daily',
+    schedule_interval= '@once', # '0 0 17 * *', #'@monthly', # for testing #  @daily',
     start_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
 #    end_date= datetime(2021,5,2), #days_ago(2), #datetime.datetime.now(), #days_ago(2),
     max_active_runs = 1,
