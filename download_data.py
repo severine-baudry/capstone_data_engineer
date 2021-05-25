@@ -17,13 +17,18 @@ def download_weather_data(out_dir):
     # TODO : create directories if needed
     url_dir = "https://www1.ncdc.noaa.gov/pub/data/ghcn/daily/"
     weather_2020 = "2020.csv.gz"
-    url_weather = urljoin( urljoin(url_dir,"by_year"), weather_2020)
+    data_dir = os.path.join(url_dir,"by_year")
+    #print(data_dir)
+    url_weather = os.path.join( data_dir , weather_2020)
+    #print(url_weather)
     out_weather = os.path.join(out_dir, weather_2020)
     try :
         urllib.request.urlretrieve(url_weather, out_weather)
-    except :
+    except  Exception as inst:
         print( f"unable to download {url_weather} to {out_weather}" )
-   
+        print(inst)
+        return
+
     for weather_file in ["ghcnd-stations.txt", "ghcnd-states.txt", "ghcnd-countries.txt", "readme.txt"]:
         url = urljoin(url_dir, weather_file)
         out = os.path.join(out_dir,  weather_file)
