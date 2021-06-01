@@ -5,12 +5,12 @@ import requests
 from urllib.error import *
 from urllib.parse import urljoin
 import zipfile
+import argparse
 
 config = configparser.ConfigParser()
 config.read("capstone.cfg")
 
-os.chdir(config["PATH"]["project"])
-project_path = config["PATH"]["project"]
+local_data_dir = config["PATH"]["LOCAL_DATA_DIR"]
 
 
 def download_weather_data(out_dir):
@@ -68,7 +68,7 @@ def download_gazetteer(out_dir):
         os.remove(uncompress)
         
 def main():
-    out_dir = "DATA2"
+    out_dir = "DATA"
     weather_dir = os.path.join(out_dir, "WEATHER")
     covid_dir = os.path.join( out_dir, "COVID")
     
