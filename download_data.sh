@@ -1,5 +1,12 @@
 #!/bin/bash
 
+if [ "$#" -ne 1 ]; then
+    echo "Usage : $0 download_dir"
+    exit
+fi
+
+
+
 wd=$PWD
 echo $wd
 
@@ -7,8 +14,9 @@ daily=https://www1.ncdc.noaa.gov/pub/data/ghcn/daily
 ldaily=(${daily}/ghcnd-stations.txt ${daily}/ghcnd-states.txt ${daily}/ghcnd-countries.txt ${daily}/readme.txt)
 lweather=( ${ldaily[@]} ${daily}/by_year/2020.csv.gz ${daily}/by_year/2021.csv.gz)
 
-
-cd TEMP_DATA
+echo $1
+mkdir $1
+cd $1
 mkdir WEATHER
 mkdir COVID
 failed=0
