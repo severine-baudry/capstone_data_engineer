@@ -74,16 +74,17 @@ class CovidPerCounty():
         self.covid_daily.select("date", "location_id", "daily_cases", "daily_deaths")\
             .repartitionByRange(10, "location_id")\
             .write\
-            .partitionBy("location_id")\
+            .option("header","true")\
             .mode("overwrite")\
-            .parquet(out_path)
+            .csv(out_path)
 
         out_path = os.path.join(self.output_path,"last_data_per_county" )
         self.last_data\
+            .repartitionByRange(10, "location_id")\
             .write\
-            .format("parquet")\
+            .option("header","true")\
             .mode("overwrite")\
-            .save(out_path)
+            .csv(out_path)
     
     def ETL(self, covid_per_county, locations):
         self.filter_locations(covid_per_county, locations)

@@ -16,7 +16,7 @@ from pyspark.sql import DataFrame, Window
 from collections import OrderedDict
 import pandas as pd
 import numpy as np
-
+import datetime
 import logging
 import argparse
 
@@ -217,10 +217,9 @@ class MapCountiesToWeatherStations():
         self.map_county_stations\
             .repartition("measured")\
             .write\
-            .partitionBy("measured")\
-            .format("parquet")\
+            .option("header","true")\
             .mode("overwrite")\
-            .save(out_path)
+            .csv(out_path)
 
         # # Output selected stations
         col_stations = self.stations.columns
@@ -230,19 +229,25 @@ class MapCountiesToWeatherStations():
 
         out_path = os.path.join(self.output_path, "weather_stations")
         selected_stations.repartitionByRange(5, "station_id")\
-            .write.format("parquet").mode("overwrite").save(out_path)
+            .write\
+            .option("header","true")\
+            .mode("overwrite")\
+            .csv(out_path)
 
 
         out_path = os.path.join(self.output_path, "weather_records")
-        self.selected_weather.repartition("measured")\
-            .repartitionByRange(5,"station_id")\
+        self.selected_weather\
+            .repartitionByRange(10,"station_id")\
             .write\
-            .partitionBy("measured")\
+            .option("header","true")\
             .mode("overwrite")\
-            .parquet(out_path)
+            .csv(out_path)
 
     def process(self, selected_stations, county_location, weather_2020, max_distance = 600):
-        self.load_stations(selected_stations)        
+        self.load_stations(selected_stations) 
+        self.df_stations_dedup.printSchema()
+        county_location.printSchema()
+        
         self.find_closest_station(county_location)
         self.filter_outliers(max_distance)
         self.process_weather(weather_2020)
@@ -264,7 +269,9 @@ def main(configname = "capstone.cfg"):
     selected_stations = spark.read.parquet(path)
     
     path = os.path.join(output_path, "nyt_locations_geography")
-    county_location = spark.read.parquet(path)
+    county_location = spark.read.option("header",True).csv(path)\
+            .withColumn("latitude", col("latitude").cast(FloatType()) )\
+            .withColumn("longitude", col("longitude").cast(FloatType()) )\
     
     path = os.path.join(input_data_dir, "WEATHER", "2020.csv.gz")
     weather_2020 = spark.read.csv(path,  
