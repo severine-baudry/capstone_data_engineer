@@ -53,6 +53,7 @@ class DownloadCDCData():
         increase default timeout to 100, since the query of such large dataset may take longer time tat default timeout
         '''
         app_token = self.config["CDC"]["APPTOKEN"]
+        print(f"connecting to CDC server")
         self.client = Socrata("data.cdc.gov",
                         app_token,
                         timeout = timeout)
@@ -70,6 +71,7 @@ class DownloadCDCData():
         download nb of covid cases per date, sex, age group, race, death status
         '''
         # by default, max number of records returned is 1000. We have to increase it to get the full results
+        print("Downloading CDC dataset")
         self.res_sex_age_race_date = self.client.get(DownloadCDCData.cdc_dataset_identifier, 
                      group = "cdc_case_earliest_dt, sex, age_group, race_ethnicity_combined, death_yn",
                      select = "cdc_case_earliest_dt, sex, age_group, race_ethnicity_combined, death_yn, count(*)",
@@ -88,8 +90,12 @@ class DownloadCDCData():
         '''
         write data to json
         '''
+        print("Writing data")
         with open(os.path.join(self.config["PATH"]["LOCAL_DOWNLOAD_DIR"], "COVID", "covid_by_pop_group.json"), "w") as fs :
-            json.dump(self.res_sex_age_race_date, fs, indent = 2)
+            # Redshift requires flattened structure...
+            for elem in self.res_sex_age_race_date :
+                json.dump(elem, fs, indent = 2)
+                fs.write("\n")
 
     def execute(self):
         self.connect()
