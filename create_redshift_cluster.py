@@ -167,12 +167,17 @@ if __name__ == "__main__":
     l_args = parser.parse_args()
     redshift_cluster = RedshiftCluster()
     redshift_cluster.execute(l_args.config)
+    
+    res_config = configparser.ConfigParser()
+    res_config["PATH"] = redshift_cluster.config["PATH"]
+    res_config["REDSHIFT"] = {
+        "ENDPOINT" : redshift_cluster.DWH_ENDPOINT,
+        "ROLE_ARN" : redshift_cluster.DWH_ROLE_ARN,
+        "DB" : redshift_cluster.DWH_DB,
+        "USER" : redshift_cluster.DWH_DB_USER,
+        "PASSWORD" : redshift_cluster.DWH_DB_PASSWORD,
+        "PORT" : redshift_cluster.DWH_PORT
+        }
+
     with open("redshift.cfg", "w") as fs :
-        
-        fs.write("[REDSHIFT]\n")
-        fs.write( f"ENDPOINT={redshift_cluster.DWH_ENDPOINT}\n")
-        fs.write( f"ROLE_ARN={redshift_cluster.DWH_ROLE_ARN}\n")
-        fs.write( f"DB={redshift_cluster.DWH_DB}\n")
-        fs.write( f"USER={redshift_cluster.DWH_DB_USER}\n")
-        fs.write( f"PASSWORD={redshift_cluster.DWH_DB_PASSWORD}\n")
-        fs.write( f"PORT={redshift_cluster.DWH_PORT}\n")
+        res_config.write(fs)

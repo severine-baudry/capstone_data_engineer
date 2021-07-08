@@ -80,6 +80,7 @@ class CovidPerCounty():
 
         out_path = os.path.join(self.output_path,"last_data_per_county" )
         self.last_data\
+            .select("date", "location_id", "cases", "deaths")\
             .repartitionByRange(10, "location_id")\
             .write\
             .option("header","true")\

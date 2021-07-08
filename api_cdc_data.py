@@ -91,16 +91,20 @@ class DownloadCDCData():
         write data to json
         '''
         print("Writing data")
-        with open(os.path.join(self.config["PATH"]["LOCAL_DOWNLOAD_DIR"], "COVID", "covid_by_pop_group.json"), "w") as fs :
+        out_file = os.path.join(self.config["PATH"]["LOCAL_DOWNLOAD_DIR"], "COVID", "covid_by_pop_group.json"
+        with open(out_file), "w") as fs :
             # Redshift requires flattened structure...
             for elem in self.res_sex_age_race_date :
                 json.dump(elem, fs, indent = 2)
                 fs.write("\n")
 
-    def execute(self):
-        self.connect()
-        self.get_covid_per_popgroup()
-        self.write()
+    def execute(self, force = False):
+        out_file = os.path.join(self.config["PATH"]["LOCAL_DOWNLOAD_DIR"], "COVID", "covid_by_pop_group.json"
+
+        if (force == True) ||  (os.path.isfile(out_file) == False):            
+            self.connect()
+            self.get_covid_per_popgroup()
+            self.write()
         
 def main(configname = "capstone.cfg"):
     """
