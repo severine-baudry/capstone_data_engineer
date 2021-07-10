@@ -1,6 +1,6 @@
 import configparser
 import psycopg2
-
+from fix_s3_path import to_s3
 config = configparser.ConfigParser()
 config.read("redshift.cfg")
 
@@ -12,21 +12,6 @@ conn = psycopg2.connect(dbname=db, user=user, password=password, host = endpoint
 conn.autocommit = True
 cur = conn.cursor()
 
-def to_s3(s3_location):
-    '''
-    convert s3a, s3n, ... to s3
-    '''
-    if s3_location[0:2] != "s3":
-        print( f"error : not a s3 path {s3_location}")
-        return s3_location
-    if s3_location[2] == ":" :
-        return s3_location 
-    elif s3_location[2] == "a" or s3_location[2] == "n" :
-        path = s3_location[0:2] + s3_location[3:]
-        return path
-    else :
-        print(f"error : not a s3 path {s3_location}")
-        return s3_location
     
 s3_location = to_s3(config["PATH"]["S3_OUTPUT_PATH"])
 

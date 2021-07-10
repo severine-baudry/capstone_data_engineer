@@ -35,6 +35,7 @@ echo "Creating redshift cluster"
 python create_redshift_cluster.py
 
 echo "Loading data to S3"
+# s3-dist-cp is much faster than individual copy
 s3-dist-cp --src=${STAGE_DATA_DIR} --dest=${S3_OUTPUT_PATH}
 
 echo "Loading data from S3 to redshift"

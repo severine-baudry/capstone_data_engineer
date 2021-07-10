@@ -1,5 +1,6 @@
 import configparser
 import psycopg2
+from fix_s3_path import to_s3
 
 config = configparser.ConfigParser()
 config.read("redshift.cfg")
@@ -12,9 +13,10 @@ conn = psycopg2.connect(dbname=db, user=user, password=password, host = endpoint
 conn.autocommit = True
 cur = conn.cursor()
 
-s3_location = config["PATH"]["S3_OUTPUT_PATH"]
+s3_location = to_s3(config["PATH"]["S3_OUTPUT_PATH"])
 
 # stage covid per population group
+print("stage fact table : covid cases per population group")
 cur.execute("""
     DROP TABLE IF EXISTS stage_cdc;
     CREATE TABLE stage_cdc (
@@ -33,7 +35,6 @@ cmd = f"""
     region 'us-west-2'
     json 'auto'
     """ 
-print(cmd)
 cur.execute(cmd)
 
 # age dimension table
@@ -177,3 +178,7 @@ else :
     print("check ok")
     
 
+# drop staging table
+cur.execute("""
+    DROP TABLE IF EXISTS stage_cdc;
+""")

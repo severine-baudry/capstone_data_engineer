@@ -17,22 +17,22 @@ class RedshiftCluster :
     
     def read_config_file(self, config_name="capstone.cfg"):
         
-        config = configparser.ConfigParser()
-        config.read_file( open(config_name))
+        self.config = configparser.ConfigParser()
+        self.config.read_file( open(config_name))
 
-        self.KEY                    = config.get('AWS','ACCESS_KEY_ID')
-        self.SECRET                 = config.get('AWS','SECRET_ACCESS_KEY')
-        self.DWH_CLUSTER_TYPE       = config.get("REDSHIFT","CLUSTER_TYPE")
-        self.DWH_NUM_NODES          = config.get("REDSHIFT","NUM_NODES")
-        self.DWH_NODE_TYPE          = config.get("REDSHIFT","NODE_TYPE")
+        self.KEY                    = self.config.get('AWS','ACCESS_KEY_ID')
+        self.SECRET                 = self.config.get('AWS','SECRET_ACCESS_KEY')
+        self.DWH_CLUSTER_TYPE       = self.config.get("REDSHIFT","CLUSTER_TYPE")
+        self.DWH_NUM_NODES          = self.config.get("REDSHIFT","NUM_NODES")
+        self.DWH_NODE_TYPE          = self.config.get("REDSHIFT","NODE_TYPE")
 
-        self.DWH_CLUSTER_IDENTIFIER = config.get("REDSHIFT","CLUSTER_IDENTIFIER")
-        self.DWH_DB                 = config.get("REDSHIFT","DB")
-        self.DWH_DB_USER            = config.get("REDSHIFT","DB_USER")
-        self.DWH_DB_PASSWORD        = config.get("REDSHIFT","DB_PASSWORD")
-        self.DWH_PORT               = config.get("REDSHIFT","PORT")
+        self.DWH_CLUSTER_IDENTIFIER = self.config.get("REDSHIFT","CLUSTER_IDENTIFIER")
+        self.DWH_DB                 = self.config.get("REDSHIFT","DB")
+        self.DWH_DB_USER            = self.config.get("REDSHIFT","DB_USER")
+        self.DWH_DB_PASSWORD        = self.config.get("REDSHIFT","DB_PASSWORD")
+        self.DWH_PORT               = self.config.get("REDSHIFT","PORT")
 
-        self.DWH_IAM_ROLE_NAME      = config.get("REDSHIFT", "IAM_ROLE_NAME")
+        self.DWH_IAM_ROLE_NAME      = self.config.get("REDSHIFT", "IAM_ROLE_NAME")
         
     def create_resource_clients(self):
         '''
